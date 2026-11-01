@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZOREX - Futuristic Audio Player</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            cyan: '#00f2fe',
+                            purple: '#4facfe',
+                            accent: '#7928ca',
+                            pink: '#ff0080',
+                            dark: '#070913',
+                            card: 'rgba(15, 23, 42, 0.65)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 12s linear infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        glow: {
+                            '0%': { filter: 'drop-shadow(0 0 5px rgba(0, 242, 254, 0.4))' },
+                            '100%': { filter: 'drop-shadow(0 0 18px rgba(121, 40, 202, 0.8))' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Glassmorphism custom styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-nav {
+            background: rgba(7, 9, 19, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .glass-player {
+            background: rgba(10, 14, 29, 0.9);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 242, 254, 0.5);
+        }
+
+        /* Neon Glow Effects */
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(0, 242, 254, 0.7), 0 0 20px rgba(0, 242, 254, 0.4);
+        }
+        .neon-box-pink {
+            box-shadow: 0 0 20px rgba(255, 0, 128, 0.3);
+        }
+
+        /* Custom Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 9999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #00f2fe;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -4px;
+            box-shadow: 0 0 10px #00f2fe;
+            transition: all 0.2s ease;
+        }
+        input[type=range]:hover::-webkit-slider-thumb {
+            transform: scale(1.3);
+            background: #ffffff;
+        }
+
+        /* Visualizer Bars Animation fallback */
+        .viz-bar {
+            transition: height 0.08s ease;
+        }
+    </style>
+</head>
+<body class="h-full overflow-hidden select-none bg-brand-dark text-slate-100 flex flex-col font-sans">
+
+    <!-- Background Ambient Glows -->
+    <div class="fixed top-[-10%] left-[-10%] w-[45vw] h-[45vw] rounded-full bg-cyan-600/10 blur-[130px] pointer-events-none z-0"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-700/15 blur-[150px] pointer-events-none z-0"></div>
+    <div class="fixed top-[40%] right-[20%] w-[30vw] h-[30vw] rounded-full bg-pink-600/10 blur-[120px] pointer-events-none z-0"></div>
+
+    <!-- Hidden YouTube API Embed Player Container -->
+    <div class="hidden">
+        <div id="youtube-player"></div>
+    </div>
+
+    <!-- App Wrapper -->
+    <div class="relative z-10 flex flex-col h-full w-full">
+
+        <!-- Top Header Navigation -->
+        <header class="glass-nav h-16 px-4 md:px-8 flex items-center justify-between shrink-0">
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="showSection('home')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-purple-600 to-pink-500 flex items-center justify-center p-0.5 shadow-lg shadow-cyan-500/20">
+                    <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                        <i class="fa-solid fa-bolt text-cyan-400 text-lg animate-pulse"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-300 to-pink-500 neon-text-cyan">
+                        ZOREX
+                    </h1>
+                </div>
+            </div>
+
+            <!-- Dynamic Search Bar -->
+            <div class="flex-1 max-w-xl mx-4 md:mx-8">
+                <form id="search-form" onsubmit="handleSearch(event)" class="relative flex items-center">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
+                    <input 
+                        type="text" 
+                        id="search-input"
+                        placeholder="Search songs, artists, or paste YouTube link / ID..." 
+                        class="w-full bg-slate-900/80 border border-slate-700/60 rounded-full py-2 pl-11 pr-12 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition duration-300 glass-panel"
+                    >
+                    <button type="submit" class="absolute right-2 px-3 py-1 bg-gradient-to-r from-cyan-500 to-purple-600 text-slate-950 font-bold rounded-full text-xs hover:opacity-90 transition">
+                        GO
+                    </button>
+                </form>
+            </div>
+
+            <!-- Header Quick Actions -->
+            <div class="flex items-center space-x-4">
+                <button onclick="toggleVideoScreen()" id="video-toggle-btn" class="hidden sm:flex items-center space-x-2 text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 px-3 py-1.5 rounded-full border border-slate-700 transition">
+                    <i class="fa-solid fa-tv text-cyan-400"></i>
+                    <span>Toggle Video</span>
+                </button>
+                <div class="hidden md:flex items-center space-x-2 text-xs text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-full border border-slate-800">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Engine: Active</span>
+                </div>
+                <button onclick="toggleVisualizerModal()" class="w-9 h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center border border-slate-700 text-cyan-400 transition" title="Toggle Full Visualizer">
+                    <i class="fa-solid fa-chart-simple text-sm"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Body Content Area -->
+        <div class="flex flex-1 overflow-hidden">
+
+            <!-- Sidebar Navigation -->
+            <aside class="w-16 md:w-64 glass-panel border-r-0 border-y-0 flex flex-col justify-between py-6 shrink-0 z-20">
+                <div class="space-y-6 px-2 md:px-4">
+                    <div class="space-y-1">
+                        <button onclick="showSection('home')" id="nav-home" class="nav-btn w-full flex items-center space-x-4 px-3 py-3 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 transition">
+                            <i class="fa-solid fa-house text-lg w-6 text-center"></i>
+                            <span class="hidden md:inline font-semibold text-sm">Home</span>
+                        </button>
+                        <button onclick="showSection('discover')" id="nav-discover" class="nav-btn w-full flex items-center space-x-4 px-3 py-3 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition">
+                            <i class="fa-solid fa-compass text-lg w-6 text-center"></i>
+                            <span class="hidden md:inline font-semibold text-sm">Discover</span>
+                        </button>
+                        <button onclick="showSection('favorites')" id="nav-favorites" class="nav-btn w-full flex items-center space-x-4 px-3 py-3 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition">
+                            <i class="fa-solid fa-heart text-lg w-6 text-center"></i>
+                            <span class="hidden md:inline font-semibold text-sm">Favorites</span>
+                        </button>
+                        <button onclick="showSection('library')" id="nav-library" class="nav-btn w-full flex items-center space-x-4 px-3 py-3 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition">
+                            <i class="fa-solid fa-compact-disc text-lg w-6 text-center"></i>
+                            <span class="hidden md:inline font-semibold text-sm">Library</span>
+                        </button>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-800 hidden md:block">
+                        <h3 class="px-3 text-xs font-bold text-slate-500 tracking-wider uppercase mb-3">Genres & Moods</h3>
+                        <div class="space-y-1 text-sm text-slate-400">
+                            <button onclick="filterByGenre('sinhala')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/40 hover:text-cyan-400 transition">🇱🇰 Sinhala Hits</button>
+                            <button onclick="filterByGenre('lofi')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/40 hover:text-cyan-400 transition">☕ Lofi & Chill</button>
+                            <button onclick="filterByGenre('tech')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/40 hover:text-cyan-400 transition">⚡ Cyber / Electro</button>
+                            <button onclick="filterByGenre('pop')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/40 hover:text-cyan-400 transition">🔥 Global Trending</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Playing Vinyl Disc Mini Preview (Desktop) -->
+                <div class="px-4 hidden md:block">
+                    <div id="sidebar-disc-card" class="p-4 rounded-2xl glass-panel text-center relative overflow-hidden group border border-slate-800">
+                        <div class="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden border-2 border-slate-700/80 shadow-2xl relative flex items-center justify-center">
+                            <img id="sidebar-thumb" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300" class="w-full h-full object-cover rounded-full" alt="Playing CD">
+                            <div class="absolute inset-0 bg-black/20 rounded-full"></div>
+                            <div class="w-6 h-6 rounded-full bg-slate-950 border-2 border-slate-700 absolute"></div>
+                        </div>
+                        <h4 id="sidebar-title" class="text-xs font-bold truncate text-slate-200">No Track Selected</h4>
+                        <p id="sidebar-artist" class="text-[11px] text-slate-400 truncate">Select a song to play</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Scrollable Content View -->
+            <main class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8" id="main-content">
+
+                <!-- Video View Display Modal / Container -->
+                <section id="video-container" class="hidden relative rounded-3xl overflow-hidden glass-panel border border-cyan-500/40 p-4 aspect-video max-w-4xl mx-auto shadow-2xl shadow-cyan-500/10">
+                    <div class="flex justify-between items-center mb-2 px-2">
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-widest"><i class="fa-solid fa-play border border-cyan-400/40 p-1 rounded-full text-[10px] mr-1"></i> ZOREX Video Player</span>
+                        <button onclick="toggleVideoScreen()" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-sm"></i> Minimize</button>
+                    </div>
+                    <div class="w-full h-[calc(100%-2rem)] rounded-2xl overflow-hidden bg-black flex items-center justify-center">
+                        <div id="youtube-player" class="w-full h-full"></div>
+                    </div>
+                </section>
+
+                <!-- Hidden YT Player Backup Container -->
+                <div id="hidden-player-holder" class="hidden"></div>
+
+                <!-- Dynamic Banner Section -->
+                <section class="relative rounded-3xl overflow-hidden glass-panel border border-slate-800/80 p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div class="absolute inset-0 bg-gradient-to-r from-cyan-950/60 via-purple-950/40 to-transparent pointer-events-none"></div>
+                    
+                    <div class="relative z-10 space-y-3 max-w-xl text-center md:text-left">
+                        <span class="px-3 py-1 bg-cyan-500/20 text-cyan-400 text-xs font-semibold rounded-full border border-cyan-500/30">
+                            ✨ UNLIMITED FREE AUDIO STREAMING
+                        </span>
+                        <h2 class="text-3xl md:text-5xl font-black text-white leading-tight">
+                            Feel The Sound of <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-pink-500">ZOREX</span>
+                        </h2>
+                        <p class="text-slate-300 text-sm md:text-base">
+                            Stream millions of tracks seamlessly. High performance audio playback engine.
+                        </p>
+                        <div class="flex items-center justify-center md:justify-start space-x-3 pt-2">
+                            <button onclick="playRandomTrack()" class="px-6 py-3 rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/25 hover:scale-105 transition active:scale-95 flex items-center space-x-2">
+                                <i class="fa-solid fa-shuffle"></i>
+                                <span>Quick Play</span>
+                            </button>
+                            <button onclick="showSection('discover')" class="px-6 py-3 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition">
+                                Explore Feed
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Canvas Audio Spectrum Visualizer -->
+                    <div class="relative z-10 flex flex-col items-center justify-center w-full md:w-72 h-36">
+                        <canvas id="hero-canvas" class="w-full h-full"></canvas>
+                    </div>
+                </section>
+
+                <!-- Audio Visualizer Dashboard Overlay Bar -->
+                <section class="glass-panel rounded-2xl p-4 border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
+                        <span class="text-xs font-bold tracking-widest text-slate-300 uppercase">Live Equalizer Spectrum</span>
+                    </div>
+                    <div class="flex items-end space-x-1 h-8 w-48 md:w-96" id="mini-spectrum-bars">
+                        <!-- Bars injected dynamically -->
+                    </div>
+                </section>
+
+                <!-- Section: Main Track Feeds Grid -->
+                <section class="space-y-4" id="section-view-container">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold text-white flex items-center space-x-2" id="feed-title">
+                            <i class="fa-solid fa-fire text-pink-500"></i>
+                            <span>Trending Beats</span>
+                        </h3>
+                        <span class="text-xs text-slate-400" id="feed-count">8 Tracks Available</span>
+                    </div>
+
+                    <!-- Track Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="track-grid">
+                        <!-- Track items dynamically injected -->
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+        <!-- Fullscreen Visualizer Modal -->
+        <div id="visualizer-modal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-50 flex flex-col justify-between p-6 md:p-12 hidden transition-all duration-500">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+                        <i class="fa-solid fa-wave-square text-cyan-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">ZOREX Immersive Visualizer</h3>
+                        <p class="text-xs text-slate-400">Realtime Audio Response Mode</p>
+                    </div>
+                </div>
+                <button onclick="toggleVisualizerModal()" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center border border-slate-700">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Full visualizer stage -->
+            <div class="flex-1 flex flex-col items-center justify-center space-y-8 my-8">
+                <div class="w-48 h-48 md:w-64 md:h-64 rounded-full border-4 border-cyan-500/30 p-2 relative flex items-center justify-center shadow-2xl shadow-cyan-500/20">
+                    <img id="viz-modal-thumb" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500" class="w-full h-full object-cover rounded-full animate-spin-slow" alt="Track Poster">
+                    <div class="absolute inset-0 rounded-full bg-cyan-500/10 animate-pulse-slow"></div>
+                </div>
+
+                <div class="text-center space-y-1">
+                    <h2 id="viz-modal-title" class="text-2xl md:text-3xl font-black text-white">No Track Playing</h2>
+                    <p id="viz-modal-artist" class="text-slate-400 text-sm">Select a song from library</p>
+                </div>
+
+                <!-- Frequency Wave Generator Bars -->
+                <div class="flex items-end justify-center space-x-2 h-40 w-full max-w-2xl px-4" id="modal-spectrum-bars">
+                    <!-- Dynamic Bars -->
+                </div>
+            </div>
+
+            <div class="text-center text-xs text-slate-500">
+                Press ESC or Close button to return to standard view
+            </div>
+        </div>
+
+        <!-- Player Bottom Bar -->
+        <footer class="glass-player h-24 px-4 md:px-8 flex items-center justify-between shrink-0 z-30">
+            
+            <!-- Left: Current Track Details -->
+            <div class="flex items-center space-x-3 w-1/4 min-w-[180px]">
+                <div class="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-700/80 shrink-0 bg-slate-900">
+                    <img id="player-thumb" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=150" class="w-full h-full object-cover" alt="Current Track">
+                </div>
+                <div class="overflow-hidden">
+                    <h4 id="player-title" class="text-xs md:text-sm font-bold text-slate-100 truncate">Select Song</h4>
+                    <p id="player-artist" class="text-[11px] text-slate-400 truncate">ZOREX Player</p>
+                </div>
+                <button id="like-btn" onclick="toggleFavoriteCurrent()" class="text-slate-500 hover:text-pink-500 transition px-2">
+                    <i class="fa-regular fa-heart text-base"></i>
+                </button>
+            </div>
+
+            <!-- Center: Player Controls & Seek Bar -->
+            <div class="flex flex-col items-center justify-center w-2/4 max-w-xl space-y-2">
+                <!-- Control Buttons -->
+                <div class="flex items-center space-x-6">
+                    <button onclick="toggleShuffle()" id="btn-shuffle" class="text-slate-400 hover:text-cyan-400 transition text-sm">
+                        <i class="fa-solid fa-shuffle"></i>
+                    </button>
+                    <button onclick="playPrevTrack()" class="text-slate-300 hover:text-white transition text-base">
+                        <i class="fa-solid fa-backward-step"></i>
+                    </button>
+                    <button onclick="togglePlayPause()" id="btn-play" class="w-11 h-11 rounded-full bg-gradient-to-tr from-cyan-400 to-purple-600 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/30 hover:scale-105 transition active:scale-95">
+                        <i class="fa-solid fa-play text-base translate-x-0.5" id="play-icon"></i>
+                    </button>
+                    <button onclick="playNextTrack()" class="text-slate-300 hover:text-white transition text-base">
+                        <i class="fa-solid fa-forward-step"></i>
+                    </button>
+                    <button onclick="toggleRepeat()" id="btn-repeat" class="text-slate-400 hover:text-cyan-400 transition text-sm">
+                        <i class="fa-solid fa-repeat"></i>
+                    </button>
+                </div>
+
+                <!-- Timeline / Seekbar -->
+                <div class="w-full flex items-center space-x-3">
+                    <span id="time-current" class="text-[11px] text-slate-400 font-mono w-10 text-right">0:00</span>
+                    <input type="range" id="seek-bar" value="0" max="100" class="w-full" oninput="onSeekInput(this.value)" onchange="onSeekChange(this.value)">
+                    <span id="time-duration" class="text-[11px] text-slate-400 font-mono w-10">0:00</span>
+                </div>
+            </div>
+
+            <!-- Right: Volume & Video Screen Toggle -->
+            <div class="flex items-center justify-end space-x-3 w-1/4 min-w-[150px]">
+                <button onclick="toggleVideoScreen()" class="text-slate-400 hover:text-cyan-400 transition p-1" title="Toggle Video Screen">
+                    <i class="fa-solid fa-tv text-sm"></i>
+                </button>
+                <button onclick="toggleMute()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-volume-high text-sm" id="volume-icon"></i>
+                </button>
+                <input type="range" id="volume-bar" value="80" max="100" class="w-20 md:w-24" oninput="setVolume(this.value)">
+            </div>
+
+        </footer>
+
+    </div>
+
+    <!-- YouTube IFrame Player API Script -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <!-- Core Audio Engine & UI JavaScript -->
+    <script>
+        // -------------------------------------------------------------
+        // 1. Initial Music Database
+        // -------------------------------------------------------------
+        const initialPlaylists = [
+            // Sinhala Hits
+            { id: '1', ytId: 'P_3k5-T-Lxg', title: 'Manike Mage Hithe', artist: 'Yohani & Satheeshan', category: 'sinhala', thumb: 'https://img.youtube.com/vi/P_3k5-T-Lxg/hqdefault.jpg' },
+            { id: '2', ytId: '4w3EydM-9z0', title: 'Raween Kanishka - Pehadhas', artist: 'Raween Kanishka', category: 'sinhala', thumb: 'https://img.youtube.com/vi/4w3EydM-9z0/hqdefault.jpg' },
+            { id: '3', ytId: '4yVb6PxlL50', title: 'Hurathal Hithe - Costa', artist: 'Costa x MasterD', category: 'sinhala', thumb: 'https://img.youtube.com/vi/4yVb6PxlL50/hqdefault.jpg' },
+            
+            // Lofi & Chill
+            { id: '4', ytId: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio Beats', artist: 'Lofi Girl Stream', category: 'lofi', thumb: 'https://img.youtube.com/vi/jfKfPfyJRdk/hqdefault.jpg' },
+            { id: '5', ytId: '5qap5aO4i9A', title: 'Lofi Chill Beats Mix', artist: 'Chilled Beats Engine', category: 'lofi', thumb: 'https://img.youtube.com/vi/5qap5aO4i9A/hqdefault.jpg' },
+
+            // Tech / Cyber / Synthwave
+            { id: '6', ytId: '4xDzrJKXOOY', title: 'Synthwave Cyberpunk Mix', artist: 'ZOREX Cyber sound', category: 'tech', thumb: 'https://img.youtube.com/vi/4xDzrJKXOOY/hqdefault.jpg' },
+            { id: '7', ytId: 'MVPTGNGiI-4', title: 'Neon Cyberpunk Track', artist: 'Electronic Cyber', category: 'tech', thumb: 'https://img.youtube.com/vi/MVPTGNGiI-4/hqdefault.jpg' },
+
+            // Global Pop / Trending
+            { id: '8', ytId: 'H5v3kku4y6Q', title: 'Harry Styles - As It Was', artist: 'Harry Styles', category: 'pop', thumb: 'https://img.youtube.com/vi/H5v3kku4y6Q/hqdefault.jpg' },
+            { id: '9', ytId: 'kJQP7kiw5Fk', title: 'Despacito - Luis Fonsi ft. Daddy Yankee', artist: 'Luis Fonsi', category: 'pop', thumb: 'https://img.youtube.com/vi/kJQP7kiw5Fk/hqdefault.jpg' }
+        ];
+
+        // Player State Variables
+        let player = null;
+        let isPlayerReady = false;
+        let isPlaying = false;
+        let currentTrackIndex = 0;
+        let currentPlaylist = [...initialPlaylists];
+        let favorites = JSON.parse(localStorage.getItem('zorex_favs')) || [];
+        let isShuffle = false;
+        let isRepeat = false;
+        let updateTimer = null;
+        let isSeeking = false;
+        let animFrameId = null;
+
+        // -------------------------------------------------------------
+        // 2. Reliable YouTube Player Setup
+        // -------------------------------------------------------------
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('youtube-player', {
+                height: '100%',
+                width: '100%',
+                videoId: currentPlaylist[0].ytId,
+                playerVars: {
+                    'autoplay': 0,
+                    'controls': 1,
+                    'disablekb': 0,
+                    'fs': 1,
+                    'modestbranding': 1,
+                    'playsinline': 1,
+                    'rel': 0
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            isPlayerReady = true;
+            const savedVol = localStorage.getItem('zorex_vol') || 80;
+            document.getElementById('volume-bar').value = savedVol;
+            player.setVolume(savedVol);
+            loadTrackToUI(currentPlaylist[0]);
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                isPlaying = true;
+                updatePlayStateUI(true);
+                startProgressLoop();
+                startCanvasVisualizer();
+            } else if (event.data === YT.PlayerState.PAUSED) {
+                isPlaying = false;
+                updatePlayStateUI(false);
+                stopProgressLoop();
+                stopCanvasVisualizer();
+            } else if (event.data === YT.PlayerState.ENDED) {
+                if (isRepeat) {
+                    player.playVideo();
+                } else {
+                    playNextTrack();
+                }
+            }
+        }
+
+        function onPlayerError(event) {
+            console.warn("Player error encountered. Playing next track...");
+            playNextTrack();
+        }
+
+        function toggleVideoScreen() {
+            const videoContainer = document.getElementById('video-container');
+            videoContainer.classList.toggle('hidden');
+        }
+
+        // -------------------------------------------------------------
+        // 3. Player Controls & Playback
+        // -------------------------------------------------------------
+        function loadAndPlayTrack(track) {
+            if (!isPlayerReady) return;
+            
+            const idx = currentPlaylist.findIndex(t => t.ytId === track.ytId);
+            if (idx !== -1) currentTrackIndex = idx;
+
+            player.loadVideoById(track.ytId);
+            player.playVideo();
+            loadTrackToUI(track);
+        }
+
+        function loadTrackToUI(track) {
+            document.getElementById('player-title').innerText = track.title;
+            document.getElementById('player-artist').innerText = track.artist;
+            document.getElementById('player-thumb').src = track.thumb;
+
+            document.getElementById('sidebar-title').innerText = track.title;
+            document.getElementById('sidebar-artist').innerText = track.artist;
+            document.getElementById('sidebar-thumb').src = track.thumb;
+
+            document.getElementById('viz-modal-title').innerText = track.title;
+            document.getElementById('viz-modal-artist').innerText = track.artist;
+            document.getElementById('viz-modal-thumb').src = track.thumb;
+
+            updateLikeIcon(track.ytId);
+        }
+
+        function togglePlayPause() {
+            if (!isPlayerReady) return;
+            const state = player.getPlayerState();
+            if (state === YT.PlayerState.PLAYING) {
+                player.pauseVideo();
+            } else {
+                player.playVideo();
+            }
+        }
+
+        function updatePlayStateUI(playing) {
+            const playIcon = document.getElementById('play-icon');
+            const cdThumb = document.getElementById('sidebar-thumb');
+            const vizCdThumb = document.getElementById('viz-modal-thumb');
+
+            if (playing) {
+                playIcon.className = 'fa-solid fa-pause text-base';
+                if (cdThumb) cdThumb.classList.add('animate-spin-slow');
+                if (vizCdThumb) vizCdThumb.classList.add('animate-spin-slow');
+            } else {
+                playIcon.className = 'fa-solid fa-play text-base translate-x-0.5';
+                if (cdThumb) cdThumb.classList.remove('animate-spin-slow');
+                if (vizCdThumb) vizCdThumb.classList.remove('animate-spin-slow');
+            }
+        }
+
+        function playNextTrack() {
+            if (currentPlaylist.length === 0) return;
+            if (isShuffle) {
+                currentTrackIndex = Math.floor(Math.random() * currentPlaylist.length);
+            } else {
+                currentTrackIndex = (currentTrackIndex + 1) % currentPlaylist.length;
+            }
+            loadAndPlayTrack(currentPlaylist[currentTrackIndex]);
+        }
+
+        function playPrevTrack() {
+            if (currentPlaylist.length === 0) return;
+            currentTrackIndex = (currentTrackIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
+            loadAndPlayTrack(currentPlaylist[currentTrackIndex]);
+        }
+
+        function playRandomTrack() {
+            if (currentPlaylist.length === 0) return;
+            const rand = Math.floor(Math.random() * currentPlaylist.length);
+            currentTrackIndex = rand;
+            loadAndPlayTrack(currentPlaylist[rand]);
+        }
+
+        // -------------------------------------------------------------
+        // 4. Seek Bar & Volume Logic
+        // -------------------------------------------------------------
+        function startProgressLoop() {
+            stopProgressLoop();
+            updateTimer = setInterval(() => {
+                if (!player || !player.getCurrentTime || isSeeking) return;
+                
+                const currentTime = player.getCurrentTime() || 0;
+                const duration = player.getDuration() || 0;
+
+                if (duration > 0) {
+                    const percent = (currentTime / duration) * 100;
+                    document.getElementById('seek-bar').value = percent;
+                    document.getElementById('time-current').innerText = formatTime(currentTime);
+                    document.getElementById('time-duration').innerText = formatTime(duration);
+                }
+            }, 500);
+        }
+
+        function stopProgressLoop() {
+            if (updateTimer) clearInterval(updateTimer);
+        }
+
+        function onSeekInput(val) {
+            isSeeking = true;
+        }
+
+        function onSeekChange(val) {
+            if (!player || !player.getDuration) return;
+            const duration = player.getDuration();
+            const targetTime = (val / 100) * duration;
+            player.seekTo(targetTime, true);
+            isSeeking = false;
+        }
+
+        function setVolume(val) {
+            if (!player) return;
+            player.setVolume(val);
+            localStorage.setItem('zorex_vol', val);
+
+            const volIcon = document.getElementById('volume-icon');
+            if (val == 0) {
+                volIcon.className = 'fa-solid fa-volume-xmark text-sm text-slate-500';
+            } else if (val < 50) {
+                volIcon.className = 'fa-solid fa-volume-low text-sm text-slate-300';
+            } else {
+                volIcon.className = 'fa-solid fa-volume-high text-sm text-slate-300';
+            }
+        }
+
+        function toggleMute() {
+            if (!player) return;
+            if (player.isMuted()) {
+                player.unMute();
+                setVolume(document.getElementById('volume-bar').value);
+            } else {
+                player.mute();
+                document.getElementById('volume-icon').className = 'fa-solid fa-volume-xmark text-sm text-pink-500';
+            }
+        }
+
+        function toggleShuffle() {
+            isShuffle = !isShuffle;
+            const btn = document.getElementById('btn-shuffle');
+            btn.className = isShuffle ? 'text-cyan-400 transition text-sm neon-text-cyan' : 'text-slate-400 hover:text-cyan-400 transition text-sm';
+        }
+
+        function toggleRepeat() {
+            isRepeat = !isRepeat;
+            const btn = document.getElementById('btn-repeat');
+            btn.className = isRepeat ? 'text-cyan-400 transition text-sm neon-text-cyan' : 'text-slate-400 hover:text-cyan-400 transition text-sm';
+        }
+
+        function formatTime(seconds) {
+            const sec = Math.floor(seconds);
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        // -------------------------------------------------------------
+        // 5. Direct Link / Search Parser Integration
+        // -------------------------------------------------------------
+        function handleSearch(e) {
+            e.preventDefault();
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+
+            // Extract YouTube Video ID from URL or return original string if it is an 11-char ID
+            const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = query.match(ytRegex);
+
+            let videoId = match ? match[1] : (query.length === 11 && !query.includes(' ') ? query : null);
+
+            if (videoId) {
+                const newTrack = {
+                    id: 'custom_' + Date.now(),
+                    ytId: videoId,
+                    title: `Direct Stream (${videoId})`,
+                    artist: 'ZOREX Audio',
+                    category: 'search',
+                    thumb: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                };
+                currentPlaylist.unshift(newTrack);
+                renderTrackGrid(currentPlaylist);
+                loadAndPlayTrack(newTrack);
+                return;
+            }
+
+            const searchTrack = {
+                id: 'search_' + Date.now(),
+                ytId: getSearchFallbackId(query),
+                title: query.charAt(0).toUpperCase() + query.slice(1),
+                artist: 'ZOREX Engine Stream',
+                category: 'search',
+                thumb: `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400`
+            };
+
+            currentPlaylist.unshift(searchTrack);
+            document.getElementById('feed-title').innerHTML = `<i class="fa-solid fa-magnifying-glass text-cyan-400"></i> <span>Search Results for: "${query}"</span>`;
+            renderTrackGrid(currentPlaylist);
+            loadAndPlayTrack(searchTrack);
+        }
+
+        function getSearchFallbackId(query) {
+            const q = query.toLowerCase();
+            if (q.includes('sinhala') || q.includes('song')) return 'P_3k5-T-Lxg';
+            if (q.includes('lofi') || q.includes('chill')) return 'jfKfPfyJRdk';
+            if (q.includes('cyber') || q.includes('dj')) return '4xDzrJKXOOY';
+            return 'H5v3kku4y6Q';
+        }
+
+        // -------------------------------------------------------------
+        // 6. Favorites Management (LocalStorage)
+        // -------------------------------------------------------------
+        function toggleFavoriteCurrent() {
+            if (currentPlaylist.length === 0) return;
+            const currentTrack = currentPlaylist[currentTrackIndex];
+            toggleFavorite(currentTrack);
+        }
+
+        function toggleFavorite(track) {
+            const idx = favorites.findIndex(f => f.ytId === track.ytId);
+            if (idx > -1) {
+                favorites.splice(idx, 1);
+            } else {
+                favorites.push(track);
+            }
+            localStorage.setItem('zorex_favs', JSON.stringify(favorites));
+            updateLikeIcon(track.ytId);
+        }
+
+        function updateLikeIcon(ytId) {
+            const isFav = favorites.some(f => f.ytId === ytId);
+            const likeBtn = document.getElementById('like-btn');
+            if (likeBtn) {
+                likeBtn.innerHTML = isFav 
+                    ? '<i class="fa-solid fa-heart text-pink-500 text-base"></i>'
+                    : '<i class="fa-regular fa-heart text-slate-500 text-base"></i>';
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 7. HTML5 Canvas Spectrum Visualizer
+        // -------------------------------------------------------------
+        function startCanvasVisualizer() {
+            const canvas = document.getElementById('hero-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            const bars = 30;
+            
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const barWidth = (canvas.width / bars) - 2;
+
+                for (let i = 0; i < bars; i++) {
+                    const barHeight = isPlaying ? Math.random() * (canvas.height * 0.8) + 5 : 4;
+                    const x = i * (barWidth + 2);
+                    const y = canvas.height - barHeight;
+
+                    const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+                    gradient.addColorStop(0, '#00f2fe');
+                    gradient.addColorStop(0.5, '#7928ca');
+                    gradient.addColorStop(1, '#ff0080');
+
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, y, barWidth, barHeight);
+                }
+
+                if (isPlaying) {
+                    animFrameId = requestAnimationFrame(draw);
+                }
+            }
+            draw();
+        }
+
+        function stopCanvasVisualizer() {
+            if (animFrameId) cancelAnimationFrame(animFrameId);
+            const canvas = document.getElementById('hero-canvas');
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function initVisualizers() {
+            const miniContainer = document.getElementById('mini-spectrum-bars');
+            if (miniContainer) {
+                miniContainer.innerHTML = Array.from({ length: 28 }).map(() => 
+                    `<div class="viz-bar flex-1 bg-cyan-400/80 rounded-t-sm h-2"></div>`
+                ).join('');
+            }
+
+            const modalContainer = document.getElementById('modal-spectrum-bars');
+            if (modalContainer) {
+                modalContainer.innerHTML = Array.from({ length: 24 }).map(() => 
+                    `<div class="viz-bar w-3 md:w-4 bg-gradient-to-t from-cyan-400 via-purple-500 to-pink-500 rounded-t-md h-4"></div>`
+                ).join('');
+            }
+        }
+
+        function toggleVisualizerModal() {
+            const modal = document.getElementById('visualizer-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('visualizer-modal').classList.add('hidden');
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 8. Navigation & Section UI Rendering
+        // -------------------------------------------------------------
+        function renderTrackGrid(tracks) {
+            const container = document.getElementById('track-grid');
+            document.getElementById('feed-count').innerText = `${tracks.length} Tracks`;
+
+            if (tracks.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-slate-500">
+                        <i class="fa-solid fa-compact-disc text-4xl mb-3"></i>
+                        <p>No tracks found in this section.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = tracks.map((track, i) => `
+                <div onclick="loadAndPlayTrack(currentPlaylist[${i}])" class="group glass-panel rounded-2xl p-3 border border-slate-800/80 hover:border-cyan-500/40 transition duration-300 cursor-pointer flex flex-col justify-between">
+                    <div class="relative w-full aspect-video rounded-xl overflow-hidden mb-3 bg-slate-900">
+                        <img src="${track.thumb}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt="${track.title}">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-400/50 transform scale-75 group-hover:scale-100 transition duration-300">
+                                <i class="fa-solid fa-play translate-x-0.5 text-lg"></i>
+                            </div>
+                        </div>
+                        <span class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-slate-950/80 text-[10px] font-mono text-cyan-400">HQ Audio</span>
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="font-bold text-sm text-slate-200 group-hover:text-cyan-400 transition truncate">${track.title}</h4>
+                        <p class="text-xs text-slate-400 truncate">${track.artist}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showSection(section) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = 'nav-btn w-full flex items-center space-x-4 px-3 py-3 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 transition';
+            });
+
+            const activeNav = document.getElementById(`nav-${section}`);
+            if (activeNav) {
+                activeNav.className = 'nav-btn w-full flex items-center space-x-4 px-3 py-3 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 transition';
+            }
+
+            const titleEl = document.getElementById('feed-title');
+
+            if (section === 'home') {
+                titleEl.innerHTML = `<i class="fa-solid fa-fire text-pink-500"></i> <span>Trending Beats</span>`;
+                currentPlaylist = [...initialPlaylists];
+            } else if (section === 'discover') {
+                titleEl.innerHTML = `<i class="fa-solid fa-compass text-cyan-400"></i> <span>Discover All Tracks</span>`;
+                currentPlaylist = [...initialPlaylists];
+            } else if (section === 'favorites') {
+                titleEl.innerHTML = `<i class="fa-solid fa-heart text-pink-500"></i> <span>My Favorite Collection</span>`;
+                currentPlaylist = [...favorites];
+            } else if (section === 'library') {
+                titleEl.innerHTML = `<i class="fa-solid fa-compact-disc text-purple-400"></i> <span>Audio Library</span>`;
+                currentPlaylist = [...initialPlaylists];
+            }
+
+            renderTrackGrid(currentPlaylist);
+        }
+
+        function filterByGenre(genre) {
+            const filtered = initialPlaylists.filter(t => t.category === genre);
+            currentPlaylist = filtered;
+            const names = {
+                'sinhala': '🇱🇰 Sinhala Hits',
+                'lofi': '☕ Lofi & Chill',
+                'tech': '⚡ Cyber & Electro',
+                'pop': '🔥 Global Trending'
+            };
+            document.getElementById('feed-title').innerHTML = `<i class="fa-solid fa-music text-cyan-400"></i> <span>${names[genre] || 'Genre'}</span>`;
+            renderTrackGrid(currentPlaylist);
+        }
+
+        // -------------------------------------------------------------
+        // 9. Startup Initialization
+        // -------------------------------------------------------------
+        window.onload = function() {
+            initVisualizers();
+            renderTrackGrid(currentPlaylist);
+        };
+    </script>
+</body>
+</html>
